@@ -1,0 +1,287 @@
+# quote_generator.py
+import json
+import random
+import tkinter as tk
+from tkinter import messagebox, ttk, filedialog
+from datetime import datetime
+
+class QuoteGenerator:
+    def __init__(self, root):
+        self.root = root
+        self.root.title("Random Quote Generator — Генератор цитат")
+        self.root.geometry("800x600")
+        self.root.resizable(True, True)
+
+        # Данные
+        self.quotes = self.get_default_quotes()
+        self.history = []
+
+        # Имена файлов
+        self.quotes_file = "quotes_data.json"
+        self.history_file = "history.json"
+
+        # Создание интерфейса
+        self.create_current_quote_section()
+        self.create_control_buttons()
+        self.create_filter_section()
+        self.create_history_table()
+
+        # Загрузка данных
+        self.load_quotes()
+        self.load_history()
+
+    def get_default_quotes(self):
+        """Предопределённый список цитат"""
+        return [
+            {"text": "Единственный способ делать великие дела — любить то, что ты делаешь.", "author": "Стив Джобс", "theme": "Работа"},
+            {"text": "Будь собой; все остальные уже заняты.", "author": "Оскар Уайльд", "theme": "Жизнь"},
+            {"text": "Воображение важнее знания.", "author": "Альберт Эйнштейн", "theme": "Наука"},
+            {"text": "Ты никогда не переплывёшь океан, если будешь бояться потерять берег из виду.", "author": "Христофор Колумб", "theme": "Мотивация"},
+            {"text": "Сложнее всего начать действовать, всё остальное зависит только от упорства.", "author": "Амелия Эрхарт", "theme": "Действие"},
+            {"text": "Жизнь — это то, что с тобой происходит, пока ты строишь планы.", "author": "Джон Леннон", "theme": "Жизнь"},
+            {"text": "Успех — это способность идти от неудачи к неудаче, не теряя энтузиазма.", "author": "Уинстон Черчилль", "theme": "Мотивация"},
+            {"text": "Наука — это организованное знание.", "author": "Герберт Спенсер", "theme": "Наука"},
+            {"text": "Работа избавляет нас от трёх великих зол: скуки, порока и нужды.", "author": "Вольтер", "theme": "Работа"},
+            {"text": "Делай сегодня то, что другие не хотят, завтра будешь жить так, как другие не могут.", "author": "Неизвестный автор", "theme": "Мотивация"},
+            {"text": "Искусство — это ложь, которая делает нас способными осознать правду.", "author": "Пабло Пикассо", "theme": "Искусство"},
+            {"text": "Знание — сила.", "author": "Фрэнсис Бэкон", "theme": "Наука"},
+            {"text": "Лучшее время посадить дерево было 20 лет назад. Следующее лучшее время — сегодня.", "author": "Китайская пословица", "theme": "Действие"},
+            {"text": "Жизнь прекрасна, когда творишь её сам.", "author": "София Лорен", "theme": "Жизнь"},
+            {"text": "Каждый художник сначала был любителем.", "author": "Ральф Уолдо Эмерсон", "theme": "Искусство"},
+        ]
+
+    def create_current_quote_section(self):
+        """Секция отображения текущей цитаты"""
+        frame = ttk.LabelFrame(self.root, text="Текущая цитата", padding=15)
+        frame.pack(fill="x", padx=10, pady=5)
+
+        self.quote_text = tk.Text(frame, height=4, wrap="word", font=("Georgia", 12, "italic"), bg="#f9f9f9")
+        self.quote_text.pack(fill="x", padx=5, pady=5)
+        self.quote_text.insert("1.0", "Нажмите 'Сгенерировать цитату'...")
+        self.quote_text.config(state="disabled")
+
+        self.author_label = ttk.Label(frame, text="Автор: —", font=("Arial", 10, "bold"))
+        self.author_label.pack(anchor="w", padx=5)
+
+        self.theme_label = ttk.Label(frame, text="Тема: —", font=("Arial", 10))
+        self.theme_label.pack(anchor="w", padx=5)
+
+    def create_control_buttons(self):
+        """Кнопки управления"""
+        btn_frame = ttk.Frame(self.root)
+        btn_frame.pack(fill="x", padx=10, pady=5)
+
+        ttk.Button(btn_frame, text="Сгенерировать цитату", command=self.generate_quote).pack(side="left", padx=5)
+        ttk.Button(btn_frame, text="Добавить цитату", command=self.add_quote_dialog).pack(side="left", padx=5)
+        ttk.Button(btn_frame, text="Сохранить историю", command=self.save_history).pack(side="left", padx=5)
+        ttk.Button(btn_frame, text="Загрузить историю", command=self.load_history).pack(side="left", padx=5)
+
+    def create_filter_section(self):
+        """Секция фильтрации"""
+        filter_frame = ttk.LabelFrame(self.root, text="Фильтр истории", padding=10)
+        filter_frame.pack(fill="x", padx=10, pady=5)
+
+        ttk.Label(filter_frame, text="Автор:").grid(row=0, column=0, padx=5)
+        self.filter_author_entry = ttk.Entry(filter_frame, width=20)
+        self.filter_author_entry.grid(row=0, column=1, padx=5)
+
+        ttk.Label(filter_frame, text="Тема:").grid(row=0, column=2, padx=5)
+        self.filter_theme_entry = ttk.Entry(filter_frame, width=20)
+        self.filter_theme_entry.grid(row=0, column=3, padx=5)
+
+        ttk.Button(filter_frame, text="Применить фильтр", command=self.apply_filter).grid(row=0, column=4, padx=10)
+        ttk.Button(filter_frame, text="Сбросить", command=self.reset_filter).grid(row=0, column=5, padx=5)
+
+    def create_history_table(self):
+        """Таблица истории"""
+        # Создаём фрейм для таблицы и скроллбара
+        table_frame = ttk.LabelFrame(self.root, text="История цитат", padding=10)
+        table_frame.pack(fill="both", expand=True, padx=10, pady=5)
+
+        # Колонки
+        columns = ("time", "text", "author", "theme")
+        self.tree = ttk.Treeview(table_frame, columns=columns, show="headings", height=12)
+        
+        # Настройка заголовков
+        self.tree.heading("time", text="Время")
+        self.tree.heading("text", text="Цитата")
+        self.tree.heading("author", text="Автор")
+        self.tree.heading("theme", text="Тема")
+
+        # Настройка ширины колонок
+        self.tree.column("time", width=150)
+        self.tree.column("text", width=300)
+        self.tree.column("author", width=150)
+        self.tree.column("theme", width=100)
+
+        # Скроллбар
+        scrollbar = ttk.Scrollbar(table_frame, orient="vertical", command=self.tree.yview)
+        self.tree.configure(yscrollcommand=scrollbar.set)
+
+        # Размещение
+        self.tree.pack(side="left", fill="both", expand=True)
+        scrollbar.pack(side="right", fill="y")
+
+    # ---- Функциональность ----
+    def generate_quote(self):
+        """Генерация случайной цитаты"""
+        if not self.quotes:
+            messagebox.showwarning("Пусто", "Нет доступных цитат! Добавьте хотя бы одну.")
+            return
+
+        quote = random.choice(self.quotes)
+        
+        # Отображение текущей цитаты
+        self.quote_text.config(state="normal")
+        self.quote_text.delete("1.0", tk.END)
+        self.quote_text.insert("1.0", f"{quote['text']}")
+        self.quote_text.config(state="disabled")
+
+        self.author_label.config(text=f"Автор: {quote['author']}")
+        self.theme_label.config(text=f"Тема: {quote['theme']}")
+
+        # Добавление в историю
+        history_entry = {
+            "time": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            "text": quote["text"],
+            "author": quote["author"],
+            "theme": quote["theme"]
+        }
+        self.history.append(history_entry)
+        self.refresh_history_table()
+        self.save_history()  # Автосохранение
+
+    def add_quote_dialog(self):
+        """Диалог добавления новой цитаты"""
+        dialog = tk.Toplevel(self.root)
+        dialog.title("Добавить цитату")
+        dialog.geometry("400x300")
+        dialog.resizable(False, False)
+
+        # Поля ввода
+        ttk.Label(dialog, text="Текст цитаты:").pack(anchor="w", padx=10, pady=(10, 0))
+        text_entry = tk.Text(dialog, height=4, width=45, font=("Georgia", 11))
+        text_entry.pack(padx=10, pady=5)
+
+        ttk.Label(dialog, text="Автор:").pack(anchor="w", padx=10, pady=(5, 0))
+        author_entry = ttk.Entry(dialog, width=40)
+        author_entry.pack(padx=10, pady=5)
+
+        ttk.Label(dialog, text="Тема:").pack(anchor="w", padx=10, pady=(5, 0))
+        theme_entry = ttk.Entry(dialog, width=40)
+        theme_entry.pack(padx=10, pady=5)
+
+        def save():
+            text = text_entry.get("1.0", tk.END).strip()
+            author = author_entry.get().strip()
+            theme = theme_entry.get().strip()
+
+            if not text:
+                messagebox.showerror("Ошибка", "Текст цитаты не может быть пустым!")
+                return
+            if not author:
+                messagebox.showerror("Ошибка", "Автор не может быть пустым!")
+                return
+            if not theme:
+                messagebox.showerror("Ошибка", "Тема не может быть пустой!")
+                return
+
+            self.quotes.append({
+                "text": text,
+                "author": author,
+                "theme": theme
+            })
+            self.save_quotes()
+            messagebox.showinfo("Успех", "Цитата добавлена!")
+            dialog.destroy()
+
+        ttk.Button(dialog, text="Сохранить", command=save).pack(pady=20)
+
+    def refresh_history_table(self, records=None):
+        """Обновление таблицы истории"""
+        # Очистка
+        for row in self.tree.get_children():
+            self.tree.delete(row)
+
+        # Заполнение
+        for rec in (records if records else self.history):
+            self.tree.insert("", "end", values=(
+                rec["time"],
+                rec["text"][:50] + "..." if len(rec["text"]) > 50 else rec["text"],
+                rec["author"],
+                rec["theme"]
+            ))
+
+    def apply_filter(self):
+        """Применение фильтра"""
+        filter_author = self.filter_author_entry.get().strip().lower()
+        filter_theme = self.filter_theme_entry.get().strip().lower()
+
+        if not filter_author and not filter_theme:
+            self.refresh_history_table()
+            return
+
+        filtered = []
+        for rec in self.history:
+            match_author = not filter_author or filter_author in rec["author"].lower()
+            match_theme = not filter_theme or filter_theme in rec["theme"].lower()
+            if match_author and match_theme:
+                filtered.append(rec)
+
+        self.refresh_history_table(filtered)
+        if not filtered:
+            messagebox.showinfo("Результат", "Нет цитат, соответствующих фильтру.")
+
+    def reset_filter(self):
+        """Сброс фильтра"""
+        self.filter_author_entry.delete(0, tk.END)
+        self.filter_theme_entry.delete(0, tk.END)
+        self.refresh_history_table()
+
+    def save_quotes(self):
+        """Сохранение всех цитат в JSON"""
+        try:
+            with open(self.quotes_file, "w", encoding="utf-8") as f:
+                json.dump(self.quotes, f, ensure_ascii=False, indent=4)
+        except Exception as e:
+            messagebox.showerror("Ошибка", f"Не удалось сохранить цитаты: {e}")
+
+    def load_quotes(self):
+        """Загрузка цитат из JSON"""
+        try:
+            with open(self.quotes_file, "r", encoding="utf-8") as f:
+                loaded = json.load(f)
+                if loaded:
+                    self.quotes = loaded
+        except FileNotFoundError:
+            pass  # Используем стандартные цитаты
+        except Exception as e:
+            messagebox.showerror("Ошибка", f"Не удалось загрузить цитаты: {e}")
+
+    def save_history(self):
+        """Сохранение истории в JSON"""
+        try:
+            with open(self.history_file, "w", encoding="utf-8") as f:
+                json.dump(self.history, f, ensure_ascii=False, indent=4)
+            messagebox.showinfo("Сохранено", "История сохранена!")
+        except Exception as e:
+            messagebox.showerror("Ошибка", f"Не удалось сохранить историю: {e}")
+
+    def load_history(self):
+        """Загрузка истории из JSON"""
+        try:
+            with open(self.history_file, "r", encoding="utf-8") as f:
+                loaded = json.load(f)
+                if loaded:
+                    self.history = loaded
+                    self.refresh_history_table()
+                    messagebox.showinfo("Загружено", f"Загружено {len(self.history)} записей истории.")
+        except FileNotFoundError:
+            pass  # Файла нет — начинаем с пустой истории
+        except Exception as e:
+            messagebox.showerror("Ошибка", f"Не удалось загрузить историю: {e}")
+
+if __name__ == "__main__":
+    root = tk.Tk()
+    app = QuoteGenerator(root)
+    root.mainloop()
